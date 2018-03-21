@@ -66,9 +66,22 @@ int main(int, char**)
 	createTrackbar("hsv_s_max", "Film", &hsv_s_max, hsv_s_max_max);
 	createTrackbar("hsv_v_max", "Film", &hsv_v_max, hsv_v_max_max);
 
+	FileStorage fs2("cam_param.yml", FileStorage::READ);
+
+	Mat cameraMatrix2, distCoeffs2;
+	fs2["cameraMatrix"] >> cameraMatrix2;
+	fs2["distCoeffs"] >> distCoeffs2;
+
+	fs2.release();
+
+
+	
+
 	while (1) {
-		if (!cap.read(frame))
-		cap >> frame;
+		Mat tmp;
+		if (!cap.read(tmp))
+		cap >> tmp;
+		undistort(tmp, frame, cameraMatrix2, distCoeffs2);
 		imshow("Film", frame);
 		Mat hsv;
 		cvtColor(frame, hsv, COLOR_BGR2HSV);
