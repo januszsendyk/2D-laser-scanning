@@ -1,5 +1,5 @@
 #include <opencv2/opencv.hpp>
-
+#include <Eigen/Core>
 using namespace cv;
 using namespace std;
 
@@ -9,6 +9,10 @@ Mat frame;
 
 
 /// Global Variables
+typedef std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d> > vectorVector2d;
+typedef std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> > vectorVector3d;
+typedef std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d> > vectorVector4d;
+
 const int alpha_slider_max = 255;
 int alpha_slider = 50;
 
@@ -108,4 +112,51 @@ int main(int, char**)
 
 	waitKey(0);
 	return 0;
+}
+bool projectImagePointsOntoPlane(const vectorVector2d &pts,
+	vectorVector3d &pts3d,
+	const cv::Mat &cameraMatrix,
+	const Eigen::Vector4d &planeEq)
+{
+	static constexpr double eps = 1e-6;
+
+	float fx = cameraMatrix.at<float>(0, 0);
+	float fy = cameraMatrix.at<float>(1, 1);
+	float cx = cameraMatrix.at<float>(0, 2);
+	float cy = cameraMatrix.at<float>(1, 2);
+
+	// camera center in homogeneous cooridinates
+	Eigen::Vector4d C;
+	C << 0, 0, 0, 1;
+
+	double den = planeEq.transpose() * C;
+
+	// plane through camera center
+	if (abs(den) < eps) {
+		return false;
+	}
+	else {
+		// pseudoinverse of the camera matrix P
+		Eigen::Matrix<double, 4, 3> Ppinv;
+		Ppinv << 1 / fx, 0, -cx / fx,
+			0, 1 / fy, -cy / fy,
+			0, 0, 1,
+			0, 0, 0;
+
+		Eigen::Matrix<double, 1, 3> pPpinv = planeEq.transpose() * Ppinv;
+
+		for (const Eigen::Vector2d &pt2d : pts) {
+			// point in homogeneous cooridinates
+			Eigen::Vector3d pt;
+			pt << pt2d(0), pt2d(1), 1;
+
+			double lambda = -(pPpinv * pt)(0) / den;
+
+			Eigen::Vector4d pt3d = Ppinv * pt + lambda * C;
+
+			// adding point in inhomogeneous coordinates
+			pts3d.push_back(pt3d.head<3>() / pt3d(3));
+		}
+		return true;
+	}
 }
