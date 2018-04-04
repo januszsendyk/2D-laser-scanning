@@ -79,15 +79,59 @@ int main(int, char**)
 	fs2.release();
 
 
-	
-
 	while (1) {
-		Mat tmp;
-		if (!cap.read(tmp))
-		cap >> tmp;
-		undistort(tmp, frame, cameraMatrix2, distCoeffs2);
+		Mat frame;
+		if (!cap.read(frame))
+		cap >> frame;
+		//undistort(tmp, frame, cameraMatrix2, distCoeffs2);
 		imshow("Film", frame);
-		Mat hsv;
+
+
+		Size patternsize(6, 8);
+		vector<Point2f> corners;
+
+		bool patternfound = findChessboardCorners(frame, patternsize, corners,
+			CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_NORMALIZE_IMAGE
+			+ CALIB_CB_FAST_CHECK);
+		if (patternfound)
+		{
+			Mat subpixel_BW;
+			cvtColor(frame, subpixel_BW, CV_BGR2GRAY);
+			cornerSubPix(subpixel_BW, corners, Size(11, 11), Size(-1, -1),
+				TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 30, 0.1));
+			//if (i == 0)
+			//cout << corners;
+			//wek.push_back(corners);
+			//dobra_wek.push_back(dobra);
+
+			namedWindow("Chessboard");
+			drawChessboardCorners(frame, patternsize, Mat(corners), patternfound);
+			imshow("Chessboard", frame);
+		}
+		vector<Point3f> axis;	//uzupe³niæ!!!!!!!!!!!!!!!!!!!!
+		vector<Point3f> objp;	//uzupe³niæ!!!!!!!!!!!!!!!!!!!!
+		vector<Point3f> rvec;
+		vector<Point3f> tvec;
+		vector<Point3f> imgpts;
+		//# Find the rotation and translation vectors.
+		solvePnP(objp, corners, cameraMatrix2, distCoeffs2, rvec, tvec);
+		//ret, rvecs, tvecs, inliers = cv2.solvePnP(objp, corners2, mtx, dist)
+		//# project 3D points to image plane
+		projectPoints(axis, rvec, tvec, cameraMatrix2, distCoeffs2, imgpts);
+		//imgpts, jac = cv2.projectPoints(axis, rvec, tvecs, mtx, dist)
+		//img = draw(img, corners2, imgpts)
+
+		int myradius = 5;
+		for (int i = 0; i<imgpts.size(); i++)
+			circle(frame, cvPoint(imgpts[i].x, imgpts[i].y), myradius, CV_RGB(100, 0, 0), -1, 8, 0);
+		imshow("Axis", frame)
+
+		//k = cv2.waitKey(0) & 0xFF
+		//if k == ord('s') :
+		//		cv2.imwrite(fname[:6] + '.png', img)
+
+
+		/*Mat hsv;
 		cvtColor(frame, hsv, COLOR_BGR2HSV);
 
 		Mat mask;
@@ -106,13 +150,14 @@ int main(int, char**)
 		mask.copyTo(linia);
 		find_first(mask, linia);
 		rotate(linia, linia, ROTATE_90_CLOCKWISE);
-		imshow("Film_linia", linia);
+		imshow("Film_linia", linia);*/
 		cv::waitKey(15);
 	}
 
 	waitKey(0);
 	return 0;
 }
+
 bool projectImagePointsOntoPlane(const vectorVector2d &pts,
 	vectorVector3d &pts3d,
 	const cv::Mat &cameraMatrix,
