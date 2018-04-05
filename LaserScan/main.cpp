@@ -107,24 +107,44 @@ int main(int, char**)
 			namedWindow("Chessboard");
 			drawChessboardCorners(frame, patternsize, Mat(corners), patternfound);
 			imshow("Chessboard", frame);
-		}
-		vector<Point3f> axis;	//uzupe³niæ!!!!!!!!!!!!!!!!!!!!
-		vector<Point3f> objp;	//uzupe³niæ!!!!!!!!!!!!!!!!!!!!
-		vector<Point3f> rvec;
-		vector<Point3f> tvec;
-		vector<Point3f> imgpts;
-		//# Find the rotation and translation vectors.
-		solvePnP(objp, corners, cameraMatrix2, distCoeffs2, rvec, tvec);
-		//ret, rvecs, tvecs, inliers = cv2.solvePnP(objp, corners2, mtx, dist)
-		//# project 3D points to image plane
-		projectPoints(axis, rvec, tvec, cameraMatrix2, distCoeffs2, imgpts);
-		//imgpts, jac = cv2.projectPoints(axis, rvec, tvecs, mtx, dist)
-		//img = draw(img, corners2, imgpts)
+		
+			
+			vector<Point3f> axis;
+			axis.push_back(cv::Point3d(0, 0, 0));
+			axis.push_back(cv::Point3d(1, 0, 0));
+			axis.push_back(cv::Point3d(0, 1, 0));
+			axis.push_back(cv::Point3d(0, 0, 1));
 
-		int myradius = 5;
-		for (int i = 0; i<imgpts.size(); i++)
-			circle(frame, cvPoint(imgpts[i].x, imgpts[i].y), myradius, CV_RGB(100, 0, 0), -1, 8, 0);
-		imshow("Axis", frame)
+			vector<Point3f> objp;
+			for (int y = 0; y < patternsize.width; y++)
+			{
+				for (int x = 0; x < patternsize.height; x++)
+				{
+					objp.push_back(cv::Point3d(x, y, 0));
+				}
+			}
+			Mat rvec(3, 1, DataType<double>::type);
+			Mat tvec(3, 1, DataType<double>::type);
+			//vector<Point3f> rvec;
+			//vector<Point3f> tvec;
+			vector<Point2f> imgpts;
+			//# Find the rotation and translation vectors.
+			solvePnP(objp, corners, cameraMatrix2, distCoeffs2, rvec, tvec);
+			//ret, rvecs, tvecs, inliers = cv2.solvePnP(objp, corners2, mtx, dist)
+			//# project 3D points to image plane
+			projectPoints(axis, rvec, tvec, cameraMatrix2, distCoeffs2, imgpts);
+			//imgpts, jac = cv2.projectPoints(axis, rvec, tvecs, mtx, dist)
+			//img = draw(img, corners2, imgpts)
+
+			int myradius = 5;
+			//for (int i = 0; i<imgpts.size(); i++)
+				circle(frame, cvPoint(imgpts[0].x, imgpts[0].y), myradius, CV_RGB(255, 0, 255), -1, 8, 0);
+				circle(frame, cvPoint(imgpts[1].x, imgpts[1].y), myradius, CV_RGB(255, 0, 0), -1, 8, 0);
+				circle(frame, cvPoint(imgpts[2].x, imgpts[2].y), myradius, CV_RGB(0, 255, 0), -1, 8, 0);
+				circle(frame, cvPoint(imgpts[3].x, imgpts[3].y), myradius, CV_RGB(0, 0, 255), -1, 8, 0);
+			imshow("Axis", frame);
+		}
+		
 
 		//k = cv2.waitKey(0) & 0xFF
 		//if k == ord('s') :
@@ -151,7 +171,7 @@ int main(int, char**)
 		find_first(mask, linia);
 		rotate(linia, linia, ROTATE_90_CLOCKWISE);
 		imshow("Film_linia", linia);*/
-		cv::waitKey(15);
+		cv::waitKey(10);
 	}
 
 	waitKey(0);
