@@ -87,7 +87,7 @@ int main(int, char**)
 		imshow("Film", frame);
 
 
-		Size patternsize(6, 8);
+		Size patternsize(7, 6);
 		vector<Point2f> corners;
 
 		bool patternfound = findChessboardCorners(frame, patternsize, corners,
@@ -130,6 +130,36 @@ int main(int, char**)
 			vector<Point2f> imgpts;
 			//# Find the rotation and translation vectors.
 			solvePnP(objp, corners, cameraMatrix2, distCoeffs2, rvec, tvec);
+
+			Mat rotMat;
+			Rodrigues(rvec, rotMat);
+
+			Mat Transf(4,4,CV_64F);
+			Transf.at<double>(0, 0) = rotMat.at<double>(0, 0);
+			Transf.at<double>(1, 0) = rotMat.at<double>(1, 0);
+			Transf.at<double>(2, 0) = rotMat.at<double>(2, 0);
+			Transf.at<double>(0, 1) = rotMat.at<double>(0, 1);
+			Transf.at<double>(1, 1) = rotMat.at<double>(1, 1);
+			Transf.at<double>(2, 1) = rotMat.at<double>(2, 1);
+			Transf.at<double>(0, 2) = rotMat.at<double>(0, 2);
+			Transf.at<double>(1, 2) = rotMat.at<double>(1, 2);
+			Transf.at<double>(2, 2) = rotMat.at<double>(2, 2);
+
+			Transf.at<double>(0, 3) = tvec.at<double>(0);
+			Transf.at<double>(1, 3) = tvec.at<double>(1);
+			Transf.at<double>(2, 3) = tvec.at<double>(2);
+
+			Transf.at<double>(3, 0) = 0;
+			Transf.at<double>(3, 1) = 0;
+			Transf.at<double>(3, 2) = 0;
+			Transf.at<double>(3, 3) = 1;
+
+			cout<<Transf<<endl;
+
+
+			Eigen::Vector4d PlaneAtCamera;
+			PlaneAtCamera << 0, 0, 1, 0;
+
 			//ret, rvecs, tvecs, inliers = cv2.solvePnP(objp, corners2, mtx, dist)
 			//# project 3D points to image plane
 			projectPoints(axis, rvec, tvec, cameraMatrix2, distCoeffs2, imgpts);
