@@ -104,21 +104,21 @@ int main(int, char**)
 			//wek.push_back(corners);
 			//dobra_wek.push_back(dobra);
 
-			namedWindow("Chessboard");
+			//namedWindow("Chessboard");
 			drawChessboardCorners(frame, patternsize, Mat(corners), patternfound);
-			imshow("Chessboard", frame);
+			//imshow("Chessboard", frame);
 		
 			
 			vector<Point3f> axis;
 			axis.push_back(cv::Point3d(0, 0, 0));
 			axis.push_back(cv::Point3d(1, 0, 0));
 			axis.push_back(cv::Point3d(0, 1, 0));
-			axis.push_back(cv::Point3d(0, 0, 1));
+			axis.push_back(cv::Point3d(0, 0, -1));
 
 			vector<Point3f> objp;
-			for (int y = 0; y < patternsize.width; y++)
+			for (int y = patternsize.height -1; y >= 0 ; y--)
 			{
-				for (int x = 0; x < patternsize.height; x++)
+				for (int x = patternsize.width-1; x >= 0; x--)
 				{
 					objp.push_back(cv::Point3d(x, y, 0));
 				}
@@ -138,10 +138,14 @@ int main(int, char**)
 
 			int myradius = 5;
 			//for (int i = 0; i<imgpts.size(); i++)
+
 				circle(frame, cvPoint(imgpts[0].x, imgpts[0].y), myradius, CV_RGB(255, 0, 255), -1, 8, 0);
 				circle(frame, cvPoint(imgpts[1].x, imgpts[1].y), myradius, CV_RGB(255, 0, 0), -1, 8, 0);
+				line(frame, cvPoint(imgpts[0].x, imgpts[0].y), cvPoint(imgpts[1].x, imgpts[1].y), CV_RGB(255, 0, 0),4);
 				circle(frame, cvPoint(imgpts[2].x, imgpts[2].y), myradius, CV_RGB(0, 255, 0), -1, 8, 0);
+				line(frame, cvPoint(imgpts[0].x, imgpts[0].y), cvPoint(imgpts[2].x, imgpts[2].y), CV_RGB(0, 255, 0),4);
 				circle(frame, cvPoint(imgpts[3].x, imgpts[3].y), myradius, CV_RGB(0, 0, 255), -1, 8, 0);
+				line(frame, cvPoint(imgpts[0].x, imgpts[0].y), cvPoint(imgpts[3].x, imgpts[3].y), CV_RGB(0, 0, 255),4);
 			imshow("Axis", frame);
 		}
 		
