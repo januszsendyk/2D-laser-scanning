@@ -33,8 +33,10 @@ int hsv_s_max = 255;
 const int hsv_v_max_max = 255;
 int hsv_v_max = 255;
 
+
+Eigen::Vector4d best_plane_from_points(Eigen::MatrixXd cloud_of_points);
 bool find_laser(Mat frame, vectorVector2d &TestVect2d);
-bool calibrate_laser(Mat frame, Mat cameraMatrix, Mat distCoeffs, Eigen::Vector4d &PlaneAtCheckerboard);
+bool calculateCheckerboardVector(Mat frame, Mat cameraMatrix, Mat distCoeffs, Eigen::Vector4d &PlaneAtCheckerboard);
 bool projectImagePointsOntoPlane(const vectorVector2d &pts,
 	vectorVector3d &pts3d,
 	const cv::Mat &cameraMatrix,
@@ -67,7 +69,8 @@ int main(int, char**)
 	//cout << cameraMatrix2.at<float>(0, 0);
 	fs2.release();
 
-
+	Eigen::MatrixXd cloud_of_points = Eigen::MatrixXd::Zero(3, 1);
+	Eigen::Vector4d PlaneEquation;
 	while (1) {
 		Mat frame;
 		vectorVector2d laserpoints2d;
@@ -77,14 +80,21 @@ int main(int, char**)
 		imshow("Film", frame);
 
 		
-		if (calibrate_laser(frame, cameraMatrix, distCoeffs, PlaneAtCheckerboard)
+		if (calculateCheckerboardVector(frame, cameraMatrix, distCoeffs, PlaneAtCheckerboard)
 			&& find_laser(frame, laserpoints2d))
 		{
-
 			vectorVector3d laserpoints3d;
 
 			projectImagePointsOntoPlane(laserpoints2d, laserpoints3d, cameraMatrix, PlaneAtCheckerboard);
-			cout << "calculeted:" << laserpoints3d.at(0) << endl;
+			//cout << "calculeted:" << laserpoints3d.at(0) << endl;
+
+			//Eigen::Vector3d test;
+			for (int i = 0; i < laserpoints3d.size(); i++)
+			{
+				cloud_of_points.conservativeResize(cloud_of_points.rows(), cloud_of_points.cols() + 1);
+				cloud_of_points.col(cloud_of_points.cols() - 1) = laserpoints3d.at(i);
+			}
+			PlaneEquation = best_plane_from_points(cloud_of_points);
 		}
 		
 
@@ -120,6 +130,49 @@ int main(int, char**)
 	return 0;
 }
 
+
+Eigen::Vector4d best_plane_from_points(Eigen::MatrixXd cloud_of_points)
+{
+
+	Eigen::MatrixXd cloud_of_points_tmp;
+	cloud_of_points_tmp = cloud_of_points.replicate(1, 1);
+	// copy coordinates to  matrix in Eigen format
+	//size_t num_atoms = pts3d.size();
+	//Eigen::Matrix< Vector3::Scalar, Eigen::Dynamic, Eigen::Dynamic > coord(3, num_atoms);
+	//for (size_t i = 0; i < num_atoms; ++i) coord.col(i) = pts3d[i];
+
+	// calculate centroid
+	Eigen::Vector3d centroid(cloud_of_points.row(0).mean(), cloud_of_points.row(1).mean(), cloud_of_points.row(2).mean());
+
+	//cout <<"centroid"<< centroid << endl;
+	//cout <<"cloud"<< cloud_of_points.col(1) << endl << endl;
+
+	// subtract centroid
+	for (int i = 0; i < cloud_of_points.cols(); i++)
+	{
+		cloud_of_points_tmp.block<3, 1>(0, i) -= centroid;
+	}
+
+	//cout << "tm" << cloud_of_points_tmp.col(1) << endl << endl;
+	// we only npeed the left-singular matrix here
+	
+	Eigen::Vector3d plane_normal;
+
+	auto svd = cloud_of_points_tmp.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
+	plane_normal = svd.matrixU().rightCols<1>();
+	//cout << plane_normal << endl << endl;
+	
+	auto distance = centroid.transpose()*plane_normal;
+	Eigen::Vector4d PlaneEq;
+	PlaneEq.head<3>() = plane_normal;//, distance.value();
+	PlaneEq(3) = distance.value();
+	//cout << distance << endl << endl;
+	cout << PlaneEq << endl << endl;
+	//return std::make_pair(centroid, plane_normal);
+	return PlaneEq;
+}
+
+
 bool find_laser(Mat frame, vectorVector2d &laserpoints2d)
 {
 
@@ -141,7 +194,7 @@ bool find_laser(Mat frame, vectorVector2d &laserpoints2d)
 	}
 	return flaga;
 }
-bool calibrate_laser(Mat frame, Mat cameraMatrix, Mat distCoeffs, Eigen::Vector4d &PlaneAtCheckerboard)
+bool calculateCheckerboardVector(Mat frame, Mat cameraMatrix, Mat distCoeffs, Eigen::Vector4d &PlaneAtCheckerboard)
 {
 	Size patternsize(7, 6);
 	vector<Point2f> corners;
@@ -181,14 +234,11 @@ bool calibrate_laser(Mat frame, Mat cameraMatrix, Mat distCoeffs, Eigen::Vector4
 		}
 		Mat rvec(3, 1, DataType<double>::type);
 		Mat tvec(3, 1, DataType<double>::type);
-		//vector<Point3f> rvec;
-		//vector<Point3f> tvec;
 		vector<Point2f> imgpts;
 		//# Find the rotation and translation vectors.
 		solvePnP(objp, corners, cameraMatrix, distCoeffs, rvec, tvec);
 
-		//cout << objp.at(0) << endl;
-		cout << "tvec:"<<tvec << endl;
+		//cout << "tvec:"<<tvec << endl;
 
 		Mat rotMat;
 		Rodrigues(rvec, rotMat);
