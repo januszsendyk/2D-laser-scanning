@@ -45,6 +45,7 @@ bool projectImagePointsOntoPlane(const vectorVector2d &pts,
 
 int main(int, char**)
 {
+	Eigen::Vector4d PlaneEquation;
 	VideoCapture cap(0); // open the default camera
 	if (!cap.isOpened()) // check if we succeeded
 		return -1;
@@ -69,61 +70,101 @@ int main(int, char**)
 	//cout << cameraMatrix2.at<float>(0, 0);
 	fs2.release();
 
-	Eigen::MatrixXd cloud_of_points = Eigen::MatrixXd::Zero(3, 1);
-	Eigen::Vector4d PlaneEquation;
-	while (1) {
-		Mat frame;
-		vectorVector2d laserpoints2d;
-		Eigen::Vector4d PlaneAtCheckerboard;
-		if (!cap.read(frame))
-		cap >> frame;
-		imshow("Film", frame);
+	FileStorage fs_Plane("PlaneEq.yml", FileStorage::READ);
+	if (fs_Plane.isOpened())
+	{
+		//Mat cameraMatrix(3, 3, CV_64F), distCoeffs(3, 3, CV_64F);
+		fs_Plane["PlaneNx"] >> PlaneEquation(0);
+		fs_Plane["PlaneNy"] >> PlaneEquation(1);
+		fs_Plane["PlaneNz"] >> PlaneEquation(2);
+		fs_Plane["PlaneD"] >> PlaneEquation(3);
 
+		cout << PlaneEquation << endl;
+		//cout << cameraMatrix2.at<float>(0, 0);
+		fs_Plane.release();
+		waitKey(0);
+	}
+	else
+	{
 		
-		if (calculateCheckerboardVector(frame, cameraMatrix, distCoeffs, PlaneAtCheckerboard)
-			&& find_laser(frame, laserpoints2d))
-		{
-			vectorVector3d laserpoints3d;
+		Eigen::MatrixXd cloud_of_points = Eigen::MatrixXd::Zero(3, 1);
 
-			projectImagePointsOntoPlane(laserpoints2d, laserpoints3d, cameraMatrix, PlaneAtCheckerboard);
-			//cout << "calculeted:" << laserpoints3d.at(0) << endl;
 
-			//Eigen::Vector3d test;
-			for (int i = 0; i < laserpoints3d.size(); i++)
+		while (1) {
+
+			vectorVector2d laserpoints2d;
+			Eigen::Vector4d PlaneAtCheckerboard;
+			Mat frame;
+			while (1)
 			{
-				cloud_of_points.conservativeResize(cloud_of_points.rows(), cloud_of_points.cols() + 1);
-				cloud_of_points.col(cloud_of_points.cols() - 1) = laserpoints3d.at(i);
+				if (!cap.read(frame))
+					cap >> frame;
+				imshow("Film", frame);
+				Mat tresholded;
+				inRange(frame, Scalar(hsv_h_min, hsv_s_min, hsv_v_min), Scalar(hsv_h_max, hsv_s_max, hsv_v_max), tresholded);
+				imshow("tresholded", tresholded);
+				if (waitKey(7) == 'p')
+				{
+					break;
+				}
+				else if (waitKey(7) == 's')
+				{
+					FileStorage file("PlaneEq.yml", cv::FileStorage::WRITE);
+					file << "PlaneNx" << PlaneEquation(0) << "PlaneNy" << PlaneEquation(1) << "PlaneNz" << PlaneEquation(2) << "PlaneD" << PlaneEquation(3);
+					file.release();
+
+					return 0;
+				}
 			}
-			PlaneEquation = best_plane_from_points(cloud_of_points);
+
+			if (calculateCheckerboardVector(frame, cameraMatrix, distCoeffs, PlaneAtCheckerboard)
+				&& find_laser(frame, laserpoints2d))
+			{
+				vectorVector3d laserpoints3d;
+
+				projectImagePointsOntoPlane(laserpoints2d, laserpoints3d, cameraMatrix, PlaneAtCheckerboard);
+				//cout << "calculeted:" << laserpoints3d.at(0) << endl;
+
+				//Eigen::Vector3d test;
+				for (int i = 0; i < laserpoints3d.size(); i++)
+				{
+					cloud_of_points.conservativeResize(cloud_of_points.rows(), cloud_of_points.cols() + 1);
+					cloud_of_points.col(cloud_of_points.cols() - 1) = laserpoints3d.at(i);
+				}
+				PlaneEquation = best_plane_from_points(cloud_of_points);
+			}
+
+
+			//k = cv2.waitKey(0) & 0xFF
+			//if k == ord('s') :
+			//		cv2.imwrite(fname[:6] + '.png', img)
+
+
+			/*Mat hsv;
+			cvtColor(frame, hsv, COLOR_BGR2HSV);
+
+			Mat mask;
+
+			inRange(hsv, Scalar(hsv_h_min, hsv_s_min, hsv_v_min), Scalar(hsv_h_max, hsv_s_max, hsv_v_max), mask);
+
+			Mat frame_dilate;
+			int erosion_size = 2;
+			Mat element = getStructuringElement(MORPH_RECT, Size(2 * erosion_size + 1, 2 * erosion_size + 1), Point(erosion_size, erosion_size));
+			//cvtColor(mediana, mediana, COLOR_HSV2BGR);
+			dilate(mask, mask, element);
+
+			imshow("Film_mask", mask);
+
+			Mat linia;
+			mask.copyTo(linia);
+			find_first(mask, linia);
+			rotate(linia, linia, ROTATE_90_CLOCKWISE);
+			imshow("Film_linia", linia);*/
+			/*if (cv::waitKey(10)=='s')
+			{
+				break;
+			}*/
 		}
-		
-
-		//k = cv2.waitKey(0) & 0xFF
-		//if k == ord('s') :
-		//		cv2.imwrite(fname[:6] + '.png', img)
-
-
-		/*Mat hsv;
-		cvtColor(frame, hsv, COLOR_BGR2HSV);
-
-		Mat mask;
-
-		inRange(hsv, Scalar(hsv_h_min, hsv_s_min, hsv_v_min), Scalar(hsv_h_max, hsv_s_max, hsv_v_max), mask);
-		
-		Mat frame_dilate;
-		int erosion_size = 2;
-		Mat element = getStructuringElement(MORPH_RECT, Size(2 * erosion_size + 1, 2 * erosion_size + 1), Point(erosion_size, erosion_size));
-		//cvtColor(mediana, mediana, COLOR_HSV2BGR);
-		dilate(mask, mask, element);
-
-		imshow("Film_mask", mask);
-
-		Mat linia;
-		mask.copyTo(linia);
-		find_first(mask, linia);
-		rotate(linia, linia, ROTATE_90_CLOCKWISE);
-		imshow("Film_linia", linia);*/
-		cv::waitKey(10);
 	}
 
 	waitKey(0);
