@@ -1,6 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
 #include <Eigen/Dense>
+#include <pcl/visualization/cloud_viewer.h>
 using namespace cv;
 using namespace std;
 
@@ -51,81 +52,99 @@ int main(int, char**)
 	createTrackbar("hsv_h_max", "Film", &hsv_h_max, hsv_h_max_max);
 	createTrackbar("hsv_s_max", "Film", &hsv_s_max, hsv_s_max_max);
 	createTrackbar("hsv_v_max", "Film", &hsv_v_max, hsv_v_max_max);*/
+	simpleCloudVisualizer();
 
 	FileStorage fs2("cam_param.yml", FileStorage::READ);
 
-	Mat cameraMatrix(3, 3, CV_64F), distCoeffs(3, 3, CV_64F);
-	fs2["cameraMatrix"] >> cameraMatrix;
-	fs2["distCoeffs"] >> distCoeffs;
-
-	//cout << cameraMatrix2 << endl;
-	//cout << cameraMatrix2.at<float>(0, 0);
-	fs2.release();
-
-	FileStorage fs_Plane("PlaneEq.yml", FileStorage::READ);
-	if (fs_Plane.isOpened())
+	if (fs2.isOpened())
 	{
-		fs_Plane["PlaneNx"] >> PlaneEquation(0);
-		fs_Plane["PlaneNy"] >> PlaneEquation(1);
-		fs_Plane["PlaneNz"] >> PlaneEquation(2);
-		fs_Plane["PlaneD"] >> PlaneEquation(3);
+		Mat cameraMatrix(3, 3, CV_64F), distCoeffs(3, 3, CV_64F);
+		fs2["cameraMatrix"] >> cameraMatrix;
+		fs2["distCoeffs"] >> distCoeffs;
 
-		cout << PlaneEquation << endl;
-		fs_Plane.release();
-		waitKey(0);
+		//cout << cameraMatrix2 << endl;
+		//cout << cameraMatrix2.at<float>(0, 0);
+		fs2.release();
+
+		FileStorage fs_Plane("PlaneEq.yml", FileStorage::READ);
+		if (fs_Plane.isOpened())
+		{
+			fs_Plane["PlaneNx"] >> PlaneEquation(0);
+			fs_Plane["PlaneNy"] >> PlaneEquation(1);
+			fs_Plane["PlaneNz"] >> PlaneEquation(2);
+			fs_Plane["PlaneD"] >> PlaneEquation(3);
+
+			cout << PlaneEquation << endl;
+			fs_Plane.release();
+			waitKey(0);
+		}
+		else
+		{
+			Eigen::MatrixXd cloud_of_points = Eigen::MatrixXd::Zero(3, 1);
+
+			while (1) {
+				vectorVector2d laserpoints2d;
+				Eigen::Vector4d PlaneAtCheckerboard;
+				Mat frame;
+				while (1)
+				{
+					if (!cap.read(frame))
+						cap >> frame;
+					imshow("frame", frame);
+					Mat tresholded;
+					inRange(frame, Scalar(hsv_h_min, hsv_s_min, hsv_v_min), Scalar(hsv_h_max, hsv_s_max, hsv_v_max), tresholded);
+					imshow("tresholded", tresholded);
+					if (waitKey(7) == 'p')
+					{
+						break;
+					}
+					else if (waitKey(7) == 's')
+					{
+						FileStorage file("PlaneEq.yml", cv::FileStorage::WRITE);
+						file << "PlaneNx" << PlaneEquation(0) << "PlaneNy" << PlaneEquation(1) << "PlaneNz" << PlaneEquation(2) << "PlaneD" << PlaneEquation(3);
+						file.release();
+
+						return 0;
+					}
+				}
+
+				if (calculateCheckerboardVector(frame, cameraMatrix, distCoeffs, PlaneAtCheckerboard)
+					&& find_laser(frame, laserpoints2d))
+				{
+					vectorVector3d laserpoints3d;
+
+					projectImagePointsOntoPlane(laserpoints2d, laserpoints3d, cameraMatrix, PlaneAtCheckerboard);
+					//cout << "calculeted:" << laserpoints3d.at(0) << endl;
+
+					for (int i = 0; i < laserpoints3d.size(); i++)
+					{
+						cloud_of_points.conservativeResize(cloud_of_points.rows(), cloud_of_points.cols() + 1);
+						cloud_of_points.col(cloud_of_points.cols() - 1) = laserpoints3d.at(i);
+					}
+					PlaneEquation = best_plane_from_points(cloud_of_points);
+				}
+			}
+		}
 	}
 	else
 	{
-		Eigen::MatrixXd cloud_of_points = Eigen::MatrixXd::Zero(3, 1);
-
-		while (1) {
-			vectorVector2d laserpoints2d;
-			Eigen::Vector4d PlaneAtCheckerboard;
-			Mat frame;
-			while (1)
-			{
-				if (!cap.read(frame))
-					cap >> frame;
-				imshow("frame", frame);
-				Mat tresholded;
-				inRange(frame, Scalar(hsv_h_min, hsv_s_min, hsv_v_min), Scalar(hsv_h_max, hsv_s_max, hsv_v_max), tresholded);
-				imshow("tresholded", tresholded);
-				if (waitKey(7) == 'p')
-				{
-					break;
-				}
-				else if (waitKey(7) == 's')
-				{
-					FileStorage file("PlaneEq.yml", cv::FileStorage::WRITE);
-					file << "PlaneNx" << PlaneEquation(0) << "PlaneNy" << PlaneEquation(1) << "PlaneNz" << PlaneEquation(2) << "PlaneD" << PlaneEquation(3);
-					file.release();
-
-					return 0;
-				}
-			}
-
-			if (calculateCheckerboardVector(frame, cameraMatrix, distCoeffs, PlaneAtCheckerboard)
-				&& find_laser(frame, laserpoints2d))
-			{
-				vectorVector3d laserpoints3d;
-
-				projectImagePointsOntoPlane(laserpoints2d, laserpoints3d, cameraMatrix, PlaneAtCheckerboard);
-				//cout << "calculeted:" << laserpoints3d.at(0) << endl;
-
-				for (int i = 0; i < laserpoints3d.size(); i++)
-				{
-					cloud_of_points.conservativeResize(cloud_of_points.rows(), cloud_of_points.cols() + 1);
-					cloud_of_points.col(cloud_of_points.cols() - 1) = laserpoints3d.at(i);
-				}
-				PlaneEquation = best_plane_from_points(cloud_of_points);
-			}
-		}
+		camCalib();
 	}
 
 	waitKey(0);
 	return 0;
 }
 
+void simpleCloudVisualizer()
+{
+	pcl::PointCloud<pcl::PointXYZRGB> cloud;
+	//... populate cloud
+	pcl::visualization::CloudViewer viewer("Simple Cloud Viewer");
+	viewer.showCloud(cloud);
+	while (!viewer.wasStopped())
+	{
+	}
+}
 
 Eigen::Vector4d best_plane_from_points(Eigen::MatrixXd cloud_of_points)
 {
