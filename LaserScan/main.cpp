@@ -1,7 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include <pcl/visualization/cloud_viewer.h>
+//#include <pcl/visualization/cloud_viewer.h>
 using namespace cv;
 using namespace std;
 
@@ -35,6 +35,7 @@ bool projectImagePointsOntoPlane(const vectorVector2d &pts,
 	const cv::Mat &cameraMatrix,
 	const Eigen::Vector4d &planeEq);
 bool camCalib();
+//void simpleCloudVisualizer();
 
 
 int main(int, char**)
@@ -52,7 +53,7 @@ int main(int, char**)
 	createTrackbar("hsv_h_max", "Film", &hsv_h_max, hsv_h_max_max);
 	createTrackbar("hsv_s_max", "Film", &hsv_s_max, hsv_s_max_max);
 	createTrackbar("hsv_v_max", "Film", &hsv_v_max, hsv_v_max_max);*/
-	simpleCloudVisualizer();
+	//simpleCloudVisualizer();
 
 	FileStorage fs2("cam_param.yml", FileStorage::READ);
 
@@ -135,16 +136,16 @@ int main(int, char**)
 	return 0;
 }
 
-void simpleCloudVisualizer()
-{
-	pcl::PointCloud<pcl::PointXYZRGB> cloud;
+//void simpleCloudVisualizer()
+//{
+	//pcl::PointCloud<pcl::PointXYZRGB> cloud;
 	//... populate cloud
-	pcl::visualization::CloudViewer viewer("Simple Cloud Viewer");
-	viewer.showCloud(cloud);
-	while (!viewer.wasStopped())
-	{
-	}
-}
+	//pcl::visualization::CloudViewer viewer("Simple Cloud Viewer");
+	//viewer.showCloud(cloud);
+	//while (!viewer.wasStopped())
+	//{
+	//}
+//}
 
 Eigen::Vector4d best_plane_from_points(Eigen::MatrixXd cloud_of_points)
 {
