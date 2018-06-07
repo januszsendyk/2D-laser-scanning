@@ -30,6 +30,9 @@ int hsv_h_max = 255;
 int hsv_s_max = 255;
 int hsv_v_max = 255;
 
+int checkerboard_size_x = 10;
+int checkerboard_size_y = 7;
+
 
 Eigen::Vector4d best_plane_from_points(Eigen::MatrixXd cloud_of_points);
 bool find_laser(Mat frame, vectorVector2d &TestVect2d);
@@ -83,10 +86,10 @@ int main(int, char**)
 	//simpleCloudVisualizer();
 
 
-	FileStorage fs2("cam_param.yml", FileStorage::READ);
+		FileStorage fs2("cam_param.yml", FileStorage::READ);
 
-	if (fs2.isOpened())
-	{
+		if (fs2.isOpened())	//if camera calibration file exists
+		{
 		Mat cameraMatrix(3, 3, CV_64F), distCoeffs(3, 3, CV_64F);
 		fs2["cameraMatrix"] >> cameraMatrix;
 		fs2["distCoeffs"] >> distCoeffs;
@@ -96,73 +99,99 @@ int main(int, char**)
 		fs2.release();
 
 		FileStorage fs_Plane("PlaneEq.yml", FileStorage::READ);
-		if (fs_Plane.isOpened())
-		{
-			fs_Plane["PlaneNx"] >> PlaneEquation(0);
-			fs_Plane["PlaneNy"] >> PlaneEquation(1);
-			fs_Plane["PlaneNz"] >> PlaneEquation(2);
-			fs_Plane["PlaneD"] >> PlaneEquation(3);
+			if (fs_Plane.isOpened())		//if laser plane equation exists
+			{
+				fs_Plane["PlaneNx"] >> PlaneEquation(0);
+				fs_Plane["PlaneNy"] >> PlaneEquation(1);
+				fs_Plane["PlaneNz"] >> PlaneEquation(2);
+				fs_Plane["PlaneD"] >> PlaneEquation(3);
 
-			cout << PlaneEquation << endl;
-			fs_Plane.release();
-			waitKey(0);
-		}
-		else
-		{
-			Eigen::MatrixXd cloud_of_points = Eigen::MatrixXd::Zero(3, 1);
+				cout << PlaneEquation << endl;
+				fs_Plane.release();
+				waitKey(0);
 
-			while (1) {
-				vectorVector2d laserpoints2d;
-				Eigen::Vector4d PlaneAtCheckerboard;
-				Mat frame;
+				Eigen::MatrixXd cloud_of_points = Eigen::MatrixXd::Zero(3, 1);
 				while (1)
 				{
-					//if (!cap.read(frame))
-						//cap >> frame;
+					vectorVector2d laserpoints2d;
+					Eigen::Vector4d PlaneAtCheckerboard;
+					Mat frame;
 					PylonCapture(frame, camera);
 					imshow("frame", frame);
-					Mat tresholded;
-					inRange(frame, Scalar(hsv_h_min, hsv_s_min, hsv_v_min), Scalar(hsv_h_max, hsv_s_max, hsv_v_max), tresholded);
-					imshow("tresholded", tresholded);
-					if (waitKey(7) == 'p')
+					if (find_laser(frame, laserpoints2d))													//and if laser found
 					{
-						break;
-					}
-					else if (waitKey(7) == 's')
-					{
-						FileStorage file("PlaneEq.yml", cv::FileStorage::WRITE);
-						file << "PlaneNx" << PlaneEquation(0) << "PlaneNy" << PlaneEquation(1) << "PlaneNz" << PlaneEquation(2) << "PlaneD" << PlaneEquation(3);
-						file.release();
+						vectorVector3d laserpoints3d;
 
-						return 0;
+						projectImagePointsOntoPlane(laserpoints2d, laserpoints3d, cameraMatrix, PlaneEquation);
+						//cout << "calculeted:" << laserpoints3d.at(0) << endl;
+
+						for (int i = 0; i < laserpoints3d.size(); i++)
+						{
+							cloud_of_points.conservativeResize(cloud_of_points.rows(), cloud_of_points.cols() + 1);
+							cloud_of_points.col(cloud_of_points.cols() - 1) = laserpoints3d.at(i);
+						}
+						PlaneEquation = best_plane_from_points(cloud_of_points);
 					}
 				}
 
-				if (calculateCheckerboardVector(frame, cameraMatrix, distCoeffs, PlaneAtCheckerboard)
-					&& find_laser(frame, laserpoints2d))
+			}
+			else							//if laser plane equation doesn't exist start plane calibartion pr
+			{
+				Eigen::MatrixXd cloud_of_points = Eigen::MatrixXd::Zero(3, 1);
+
+				while (1) 
 				{
-					vectorVector3d laserpoints3d;
-
-					projectImagePointsOntoPlane(laserpoints2d, laserpoints3d, cameraMatrix, PlaneAtCheckerboard);
-					//cout << "calculeted:" << laserpoints3d.at(0) << endl;
-
-					for (int i = 0; i < laserpoints3d.size(); i++)
+					vectorVector2d laserpoints2d;
+					Eigen::Vector4d PlaneAtCheckerboard;
+					Mat frame;
+					while (1)
 					{
-						cloud_of_points.conservativeResize(cloud_of_points.rows(), cloud_of_points.cols() + 1);
-						cloud_of_points.col(cloud_of_points.cols() - 1) = laserpoints3d.at(i);
+						//if (!cap.read(frame))
+							//cap >> frame;
+						PylonCapture(frame, camera);
+						imshow("frame", frame);
+						Mat tresholded;
+						inRange(frame, Scalar(hsv_h_min, hsv_s_min, hsv_v_min), Scalar(hsv_h_max, hsv_s_max, hsv_v_max), tresholded);
+						imshow("tresholded", tresholded);
+						if (waitKey(7) == 'p')
+						{
+							break;
+						}
+						else if (waitKey(7) == 's')
+						{
+							FileStorage file("PlaneEq.yml", cv::FileStorage::WRITE);
+							file << "PlaneNx" << PlaneEquation(0) << "PlaneNy" << PlaneEquation(1) << "PlaneNz" << PlaneEquation(2) << "PlaneD" << PlaneEquation(3);
+							file.release();
+
+							return 0;
+						}
 					}
-					PlaneEquation = best_plane_from_points(cloud_of_points);
+
+					if (calculateCheckerboardVector(frame, cameraMatrix, distCoeffs, PlaneAtCheckerboard)		//if checkerboard vector found
+						&& find_laser(frame, laserpoints2d))													//and if laser found
+					{
+						vectorVector3d laserpoints3d;
+
+						projectImagePointsOntoPlane(laserpoints2d, laserpoints3d, cameraMatrix, PlaneAtCheckerboard);
+						//cout << "calculeted:" << laserpoints3d.at(0) << endl;
+
+						for (int i = 0; i < laserpoints3d.size(); i++)
+						{
+							cloud_of_points.conservativeResize(cloud_of_points.rows(), cloud_of_points.cols() + 1);
+							cloud_of_points.col(cloud_of_points.cols() - 1) = laserpoints3d.at(i);
+						}
+						PlaneEquation = best_plane_from_points(cloud_of_points);
+					}
 				}
 			}
 		}
-	}
-	else
-	{
-		camCalib(camera);
-	}
+		else				//if camera calibration file does'n exist start camera calibration procedure
+		{
+			camCalib(camera);
+		}
 
-	waitKey(0);
-	return 0;
+		waitKey(0);
+		return 0;
 
 	}
 	catch (GenICam::GenericException &e)
@@ -216,7 +245,7 @@ Eigen::Vector4d best_plane_from_points(Eigen::MatrixXd cloud_of_points)
 	return PlaneEq;
 }
 
-
+//create vector of points from tresholded image
 bool find_laser(Mat frame, vectorVector2d &laserpoints2d)
 {
 
@@ -240,7 +269,7 @@ bool find_laser(Mat frame, vectorVector2d &laserpoints2d)
 }
 bool calculateCheckerboardVector(Mat frame, Mat cameraMatrix, Mat distCoeffs, Eigen::Vector4d &PlaneAtCheckerboard)
 {
-	Size patternsize(7, 6);
+	Size patternsize(checkerboard_size_y, checkerboard_size_x);
 	vector<Point2f> corners;
 
 	bool patternfound = findChessboardCorners(frame, patternsize, corners,
@@ -380,8 +409,8 @@ bool camCalib(CInstantCamera& camera)
 	//if (!cap.isOpened()) // check if we succeeded
 		//return -1;
 
-	for (int i = 0; i < 6; i++)
-		for (int j = 0; j < 7; j++)
+	for (int i = 0; i < checkerboard_size_x; i++)
+		for (int j = 0; j < checkerboard_size_y; j++)
 		{
 			dobra.push_back(Point3f(j, i, 0));
 		}
@@ -401,7 +430,7 @@ bool camCalib(CInstantCamera& camera)
 
 		temp.copyTo(img[i]);
 
-		Size patternsize(7, 6);
+		Size patternsize(checkerboard_size_y, checkerboard_size_x);
 		vector<Point2f> corners;
 
 		imshow("Chessboard", img[i]);
@@ -525,10 +554,6 @@ int PylonCapture(Mat& frame, CInstantCamera& camera)// IPylonDevice* pDevice)
 				<< e.GetDescription() << endl;
 			exitCode = 1;
 		}
-
-		// Comment the following two lines to disable waiting on exit.
-		//cerr << endl << "Press Enter to exit." << endl;
-		//while (cin.get() != '\n');
 
 		return exitCode;
 
