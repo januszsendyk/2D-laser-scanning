@@ -32,6 +32,7 @@ int hsv_v_max = 255;
 
 int checkerboard_size_x = 10;
 int checkerboard_size_y = 7;
+const int camera_calib_img_count = 40;
 
 
 Eigen::Vector4d best_plane_from_points(Eigen::MatrixXd cloud_of_points);
@@ -108,7 +109,7 @@ int main(int, char**)
 
 				cout << PlaneEquation << endl;
 				fs_Plane.release();
-				waitKey(0);
+				//waitKey(0);
 
 				Eigen::MatrixXd cloud_of_points = Eigen::MatrixXd::Zero(3, 1);
 				while (1)
@@ -116,8 +117,28 @@ int main(int, char**)
 					vectorVector2d laserpoints2d;
 					Eigen::Vector4d PlaneAtCheckerboard;
 					Mat frame;
-					PylonCapture(frame, camera);
-					imshow("frame", frame);
+					while (1)
+					{
+						//if (!cap.read(frame))
+						//cap >> frame;
+						PylonCapture(frame, camera);
+						imshow("frame", frame);
+						if (waitKey(7) == 'n')
+						{
+							break;
+						}
+						if (waitKey(7) == 's')
+						{
+							std::ofstream file("cloud.txt");
+							if (file.is_open())
+							{
+								file << cloud_of_points << '\n';
+								return 0;
+							}
+							
+						}
+					}
+					
 					if (find_laser(frame, laserpoints2d))													//and if laser found
 					{
 						vectorVector3d laserpoints3d;
@@ -130,7 +151,9 @@ int main(int, char**)
 							cloud_of_points.conservativeResize(cloud_of_points.rows(), cloud_of_points.cols() + 1);
 							cloud_of_points.col(cloud_of_points.cols() - 1) = laserpoints3d.at(i);
 						}
-						PlaneEquation = best_plane_from_points(cloud_of_points);
+						//cout << cloud_of_points << endl;
+						//waitKey(10);
+						//PlaneEquation = best_plane_from_points(cloud_of_points);
 					}
 				}
 
@@ -181,6 +204,7 @@ int main(int, char**)
 							cloud_of_points.col(cloud_of_points.cols() - 1) = laserpoints3d.at(i);
 						}
 						PlaneEquation = best_plane_from_points(cloud_of_points);
+						cout << cloud_of_points.size();
 					}
 				}
 			}
@@ -398,7 +422,7 @@ bool projectImagePointsOntoPlane(const vectorVector2d &pts,
 bool camCalib(CInstantCamera& camera)
 {
 	Mat temp;
-	Mat img[20];
+	Mat img[camera_calib_img_count];
 	string nazwa;
 	vector<vector<Point2f>> wek;
 	vector<Point3f> dobra;
@@ -425,7 +449,7 @@ bool camCalib(CInstantCamera& camera)
 		if (waitKey(30) >= 0) break;
 	}
 	
-	for (int i = 0; i < 20; )
+	for (int i = 0; i < camera_calib_img_count; )
 	{
 
 		temp.copyTo(img[i]);
@@ -452,7 +476,7 @@ bool camCalib(CInstantCamera& camera)
 			drawChessboardCorners(img[i], patternsize, Mat(corners), patternfound);
 			imshow("Chessboard", img[i]);
 			i++;
-			cout<< i << " of 20" <<endl;
+			cout<< i << " of " << camera_calib_img_count <<endl;
 		}
 
 		while (1)
@@ -500,7 +524,7 @@ int PylonCapture(Mat& frame, CInstantCamera& camera)// IPylonDevice* pDevice)
 	{
 		// The parameter MaxNumBuffer can be used to control the count of buffers
 		// allocated for grabbing. The default value of this parameter is 10.
-		camera.MaxNumBuffer = 10;
+		camera.MaxNumBuffer = 100;
 		
 		// create pylon image format converter and pylon image
 		CImageFormatConverter formatConverter;
@@ -539,7 +563,7 @@ int PylonCapture(Mat& frame, CInstantCamera& camera)// IPylonDevice* pDevice)
 					// Define a timeout for customer's input in ms.
 					// '0' means indefinite, i.e. the next image will be displayed after closing the window 
 					// '1' means live stream
-					//waitKey(1);
+					waitKey(10);
 				}
 				else
 				{
